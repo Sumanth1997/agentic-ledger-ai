@@ -1,0 +1,291 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { supabase, Transaction } from '@/lib/supabase';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
+} from 'recharts';
+
+// Category mapping based on description keywords
+function categorizeTransaction(description: string): string {
+  const desc = description.toLowerCase();
+  if (desc.includes('walmart') || desc.includes('target') || desc.includes('amazon')) return 'Shopping';
+  if (desc.includes('doordash') || desc.includes('uber eats') || desc.includes('grubhub') || desc.includes('halal')) return 'Food & Dining';
+  if (desc.includes('lyft') || desc.includes('uber') && !desc.includes('eats')) return 'Transportation';
+  if (desc.includes('google') || desc.includes('microsoft') || desc.includes('netflix') || desc.includes('spotify')) return 'Subscriptions';
+  if (desc.includes('bill payment') || desc.includes('payment')) return 'Payments';
+  if (desc.includes('housing') || desc.includes('rent')) return 'Housing';
+  return 'Other';
+}
+
+const COLORS = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6366F1'];
+
+export default function Dashboard() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('transaction_date', { ascending: true });
+
+      if (!error && data) {
+        setTransactions(data);
+      }
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // Calculate stats
+  const debits = transactions.filter(t => t.transaction_type === 'debit');
+  const credits = transactions.filter(t => t.transaction_type === 'credit');
+  const totalSpending = debits.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalCredits = credits.reduce((sum, t) => sum + Number(t.amount), 0);
+  const avgTransaction = debits.length > 0 ? totalSpending / debits.length : 0;
+
+  // Monthly spending data
+  const monthlyData = transactions.reduce((acc, t) => {
+    if (t.transaction_type !== 'debit') return acc;
+    const month = t.transaction_date.substring(0, 7); // YYYY-MM
+    const existing = acc.find(m => m.month === month);
+    if (existing) {
+      existing.amount += Number(t.amount);
+    } else {
+      acc.push({ month, amount: Number(t.amount) });
+    }
+    return acc;
+  }, [] as { month: string; amount: number }[]).sort((a, b) => a.month.localeCompare(b.month));
+
+  // Category data
+  const categoryData = debits.reduce((acc, t) => {
+    const category = categorizeTransaction(t.description);
+    const existing = acc.find(c => c.name === category);
+    if (existing) {
+      existing.value += Number(t.amount);
+    } else {
+      acc.push({ name: category, value: Number(t.amount) });
+    }
+    return acc;
+  }, [] as { name: string; value: number }[]).sort((a, b) => b.value - a.value);
+
+  // Credits vs Debits by month
+  const comparisonData = transactions.reduce((acc, t) => {
+    const month = t.transaction_date.substring(0, 7);
+    const existing = acc.find(m => m.month === month);
+    const amount = Number(t.amount);
+    if (existing) {
+      if (t.transaction_type === 'debit') existing.debits += amount;
+      else existing.credits += amount;
+    } else {
+      acc.push({
+        month,
+        debits: t.transaction_type === 'debit' ? amount : 0,
+        credits: t.transaction_type === 'credit' ? amount : 0,
+      });
+    }
+    return acc;
+  }, [] as { month: string; debits: number; credits: number }[]).sort((a, b) => a.month.localeCompare(b.month));
+
+  // Recent transactions
+  const recentTransactions = [...transactions]
+    .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date))
+    .slice(0, 10);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-white mb-2">
+          💳 Transaction Dashboard
+        </h1>
+        <p className="text-purple-300">Zolve Credit Card Analytics</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          title="Total Spending"
+          value={`$${totalSpending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="All debit transactions"
+          color="from-red-500 to-pink-500"
+        />
+        <StatCard
+          title="Total Credits"
+          value={`$${totalCredits.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Payments & refunds"
+          color="from-green-500 to-emerald-500"
+        />
+        <StatCard
+          title="Transactions"
+          value={transactions.length.toString()}
+          subtitle={`${debits.length} debits, ${credits.length} credits`}
+          color="from-blue-500 to-cyan-500"
+        />
+        <StatCard
+          title="Avg Transaction"
+          value={`$${avgTransaction.toFixed(2)}`}
+          subtitle="Per debit transaction"
+          color="from-purple-500 to-violet-500"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Monthly Spending Trend */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+          <h2 className="text-xl font-semibold text-white mb-4">📈 Monthly Spending</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={monthlyData}>
+              <defs>
+                <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
+              <XAxis dataKey="month" stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
+              <YAxis stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1e1b4b', border: 'none', borderRadius: '8px' }}
+                labelStyle={{ color: '#ffffff' }}
+              />
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="#8B5CF6"
+                fillOpacity={1}
+                fill="url(#colorAmount)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Category Breakdown */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+          <h2 className="text-xl font-semibold text-white mb-4">🥧 Spending by Category</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={categoryData}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={5}
+                dataKey="value"
+              >
+                {categoryData.map((entry, index) => (
+                  <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1e1b4b', border: 'none', borderRadius: '8px' }}
+                formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Amount']}
+              />
+              <Legend
+                wrapperStyle={{ color: '#ffffff' }}
+                formatter={(value) => <span className="text-white">{value}</span>}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Credits vs Debits Chart */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">📊 Credits vs Debits</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={comparisonData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
+            <XAxis dataKey="month" stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
+            <YAxis stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1e1b4b', border: 'none', borderRadius: '8px' }}
+              formatter={(value) => [`$${Number(value).toFixed(2)}`]}
+            />
+            <Legend wrapperStyle={{ color: '#ffffff' }} />
+            <Bar dataKey="debits" fill="#EF4444" name="Spending" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="credits" fill="#10B981" name="Credits" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Recent Transactions Table */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+        <h2 className="text-xl font-semibold text-white mb-4">📋 Recent Transactions</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-purple-300 border-b border-white/20">
+                <th className="pb-3 font-medium">Date</th>
+                <th className="pb-3 font-medium">Description</th>
+                <th className="pb-3 font-medium">Category</th>
+                <th className="pb-3 font-medium text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTransactions.map((tx) => (
+                <tr key={tx.id} className="border-b border-white/10 hover:bg-white/5">
+                  <td className="py-3 text-white">{tx.transaction_date}</td>
+                  <td className="py-3 text-white truncate max-w-xs">{tx.description}</td>
+                  <td className="py-3">
+                    <span className="px-2 py-1 rounded-full text-xs bg-purple-500/30 text-purple-200">
+                      {categorizeTransaction(tx.description)}
+                    </span>
+                  </td>
+                  <td className={`py-3 text-right font-medium ${tx.transaction_type === 'credit' ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                    {tx.transaction_type === 'credit' ? '+' : '-'}${Number(tx.amount).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+  subtitle,
+  color,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  color: string;
+}) {
+  return (
+    <div className={`bg-gradient-to-br ${color} rounded-2xl p-6 shadow-xl`}>
+      <p className="text-white/80 text-sm font-medium mb-1">{title}</p>
+      <p className="text-3xl font-bold text-white mb-1">{value}</p>
+      <p className="text-white/60 text-sm">{subtitle}</p>
+    </div>
+  );
+}
