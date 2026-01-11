@@ -18,17 +18,7 @@ import {
   Legend,
 } from 'recharts';
 
-// Category mapping based on description keywords
-function categorizeTransaction(description: string): string {
-  const desc = description.toLowerCase();
-  if (desc.includes('walmart') || desc.includes('target') || desc.includes('amazon')) return 'Shopping';
-  if (desc.includes('doordash') || desc.includes('uber eats') || desc.includes('grubhub') || desc.includes('halal')) return 'Food & Dining';
-  if (desc.includes('lyft') || desc.includes('uber') && !desc.includes('eats')) return 'Transportation';
-  if (desc.includes('google') || desc.includes('microsoft') || desc.includes('netflix') || desc.includes('spotify')) return 'Subscriptions';
-  if (desc.includes('bill payment') || desc.includes('payment')) return 'Payments';
-  if (desc.includes('housing') || desc.includes('rent')) return 'Housing';
-  return 'Other';
-}
+// Helper to get category from transaction (uses database category)
 
 const COLORS = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6366F1'];
 
@@ -81,7 +71,7 @@ export default function Dashboard() {
 
   // Category data
   const categoryData = debits.reduce((acc, t) => {
-    const category = categorizeTransaction(t.description);
+    const category = t.category || 'Uncategorized';
     const existing = acc.find(c => c.name === category);
     if (existing) {
       existing.value += Number(t.amount);
@@ -253,7 +243,7 @@ export default function Dashboard() {
                   <td className="py-3 text-white truncate max-w-xs">{tx.description}</td>
                   <td className="py-3">
                     <span className="px-2 py-1 rounded-full text-xs bg-purple-500/30 text-purple-200">
-                      {categorizeTransaction(tx.description)}
+                      {tx.category || 'Uncategorized'}
                     </span>
                   </td>
                   <td className={`py-3 text-right font-medium ${tx.transaction_type === 'credit' ? 'text-green-400' : 'text-red-400'

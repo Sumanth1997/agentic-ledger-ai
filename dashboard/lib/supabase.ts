@@ -13,6 +13,7 @@ export type Transaction = {
     description: string;
     amount: number;
     transaction_type: 'credit' | 'debit';
+    category: string | null;
     created_at: string;
 };
 
