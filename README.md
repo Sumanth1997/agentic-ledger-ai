@@ -267,7 +267,3 @@ agentic-ledger-ai/
 MIT License - Feel free to use and modify for personal or commercial projects.
 
 ---
-
-<p align="center">
-  Built with ❤️ using Python, Next.js, CrewAI, and Ollama
-</p>
