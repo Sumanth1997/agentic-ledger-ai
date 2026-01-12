@@ -20,11 +20,19 @@ import {
 
 // Helper to get category from transaction (uses database category)
 
-const COLORS = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6366F1'];
+const COLORS = ['#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899'];
+
+interface AIInsights {
+  timestamp: string | null;
+  analysis: string | null;
+  status: string;
+}
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiInsights, setAiInsights] = useState<AIInsights | null>(null);
+  const [showInsights, setShowInsights] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -38,12 +46,24 @@ export default function Dashboard() {
       }
       setLoading(false);
     }
+
+    async function fetchInsights() {
+      try {
+        const res = await fetch('/api/analysis');
+        const data = await res.json();
+        setAiInsights(data);
+      } catch (e) {
+        console.error('Failed to fetch AI insights:', e);
+      }
+    }
+
     fetchData();
+    fetchInsights();
   }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>
       </div>
     );
@@ -105,13 +125,13 @@ export default function Dashboard() {
     .slice(0, 10);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-white mb-2">
           💳 Transaction Dashboard
         </h1>
-        <p className="text-purple-300">Zolve Credit Card Analytics</p>
+        <p className="text-slate-400">Zolve Credit Card Analytics</p>
       </div>
 
       {/* Stats Cards */}
@@ -138,9 +158,51 @@ export default function Dashboard() {
           title="Avg Transaction"
           value={`$${avgTransaction.toFixed(2)}`}
           subtitle="Per debit transaction"
-          color="from-purple-500 to-violet-500"
+          color="from-slate-600 to-slate-500"
         />
       </div>
+
+      {/* AI Insights Panel */}
+      {aiInsights && aiInsights.status === 'completed' && (
+        <div className="bg-gradient-to-r from-cyan-900/30 to-slate-800/50 backdrop-blur-lg rounded-2xl p-6 border border-cyan-500/30 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🤖</span>
+              <h2 className="text-xl font-semibold text-white">AI Insights</h2>
+              <span className="px-2 py-1 rounded-full text-xs bg-green-500/30 text-green-200">
+                Powered by Ollama
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              {aiInsights.timestamp && (
+                <span className="text-slate-400 text-sm">
+                  Updated: {new Date(aiInsights.timestamp).toLocaleString()}
+                </span>
+              )}
+              <button
+                onClick={() => setShowInsights(!showInsights)}
+                className="px-4 py-2 bg-cyan-500/30 hover:bg-cyan-500/50 text-white rounded-lg transition-colors"
+              >
+                {showInsights ? 'Hide Details' : 'Show Details'}
+              </button>
+            </div>
+          </div>
+
+          {showInsights && aiInsights.analysis && (
+            <div className="bg-black/20 rounded-xl p-4 max-h-96 overflow-y-auto">
+              <pre className="text-slate-200 text-sm whitespace-pre-wrap font-mono">
+                {aiInsights.analysis}
+              </pre>
+            </div>
+          )}
+
+          {!showInsights && (
+            <p className="text-slate-300 text-sm">
+              Click &quot;Show Details&quot; to view spending analysis, budget recommendations, and anomaly detection.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -151,21 +213,21 @@ export default function Dashboard() {
             <AreaChart data={monthlyData}>
               <defs>
                 <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
               <XAxis dataKey="month" stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
               <YAxis stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1e1b4b', border: 'none', borderRadius: '8px' }}
+                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
                 labelStyle={{ color: '#ffffff' }}
               />
               <Area
                 type="monotone"
                 dataKey="amount"
-                stroke="#8B5CF6"
+                stroke="#06B6D4"
                 fillOpacity={1}
                 fill="url(#colorAmount)"
               />
@@ -192,7 +254,7 @@ export default function Dashboard() {
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{ backgroundColor: '#1e1b4b', border: 'none', borderRadius: '8px' }}
+                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
                 formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Amount']}
               />
               <Legend
@@ -213,7 +275,7 @@ export default function Dashboard() {
             <XAxis dataKey="month" stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
             <YAxis stroke="#ffffff80" tick={{ fill: '#ffffff80' }} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1e1b4b', border: 'none', borderRadius: '8px' }}
+              contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
               formatter={(value) => [`$${Number(value).toFixed(2)}`]}
             />
             <Legend wrapperStyle={{ color: '#ffffff' }} />
@@ -229,7 +291,7 @@ export default function Dashboard() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-purple-300 border-b border-white/20">
+              <tr className="text-left text-slate-400 border-b border-white/20">
                 <th className="pb-3 font-medium">Date</th>
                 <th className="pb-3 font-medium">Description</th>
                 <th className="pb-3 font-medium">Category</th>
@@ -242,7 +304,7 @@ export default function Dashboard() {
                   <td className="py-3 text-white">{tx.transaction_date}</td>
                   <td className="py-3 text-white truncate max-w-xs">{tx.description}</td>
                   <td className="py-3">
-                    <span className="px-2 py-1 rounded-full text-xs bg-purple-500/30 text-purple-200">
+                    <span className="px-2 py-1 rounded-full text-xs bg-cyan-500/30 text-cyan-200">
                       {tx.category || 'Uncategorized'}
                     </span>
                   </td>
