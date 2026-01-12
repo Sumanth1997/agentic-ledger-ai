@@ -1,7 +1,5 @@
 # 🏦 Agentic Ledger AI
 
-![System Architecture](docs/system_architecture.png)
-
 An intelligent personal finance management system that automatically fetches credit card statements from Gmail, extracts transaction data, and categorizes spending using AI. Then it utilizes multi-agent system to analyze spending, provide budget advice, and detect anomalies.
 
 ---
@@ -130,22 +128,6 @@ Output: Flagged transactions table (duplicates, large purchases)
 | `Get Category Stats` | Returns spending breakdown by category with percentages |
 | `Get Monthly Trends` | Analyzes month-over-month spending changes |
 | `Detect Anomalies` | Identifies duplicates and transactions >3x average |
-
-### Agent Communication Flow
-
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│ Spending        │────▶│ Budget          │────▶│ Anomaly         │
-│ Analyst         │     │ Advisor         │     │ Detector        │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-        │                       │                       │
-        ▼                       ▼                       ▼
-   Category Stats          Recommendations        Flagged Table
-   Monthly Trends          Savings Tips           + Actions
-   Key Insights            Next Steps
-```
-
----
 
 ## 🔧 Technical Specifications
 
